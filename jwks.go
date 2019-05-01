@@ -160,7 +160,7 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 		// once the goroutine is done.
 		go func() {
 			// Sync keys and finish inflight when that's done.
-			keys, expiry, err := r.updateKeys()
+			keys, expiry, err := r.updateKeys(ctx)
 
 			r.inflight.done(keys, err)
 
@@ -189,13 +189,13 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 	}
 }
 
-func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
+func (r *remoteKeySet) updateKeys(ctx context.Context) ([]jose.JSONWebKey, time.Time, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: can't create request: %v", err)
 	}
 
-	resp, err := doRequest(r.ctx, req)
+	resp, err := doRequest(ctx, req)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed %v", err)
 	}
