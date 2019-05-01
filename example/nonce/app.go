@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	oidc "github.com/coreos/go-oidc"
+	oidc "github.com/caos/go-oidc"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
