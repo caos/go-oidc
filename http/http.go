@@ -1,4 +1,4 @@
-package oidc
+package http
 
 import (
 	"encoding/json"
@@ -14,6 +14,8 @@ var (
 	}
 )
 
+//TODO: header (accept application/json)
+//Get parses the response 
 func Get(url string, response interface{}, client *http.Client) error {
 	resp, err := client.Get(url)
 	if err != nil {
