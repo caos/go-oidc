@@ -133,7 +133,7 @@ func Test_CheckIssuedAt(t *testing.T) {
 
 func TestDefaultVerifier_checkIssuedAt(t *testing.T) {
 	type fields struct {
-		config *VerifierConfig
+		config *verifierConfig
 	}
 	type args struct {
 		issuedAt time.Time
@@ -144,13 +144,13 @@ func TestDefaultVerifier_checkIssuedAt(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OK", fields{&VerifierConfig{IAT: &IATConfig{}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, false},
-		{"OK Ignored", fields{&VerifierConfig{IAT: &IATConfig{Ignore: true}}}, args{time.Now().UTC().Add(5 * time.Minute)}, false},
-		{"OK Offset", fields{&VerifierConfig{IAT: &IATConfig{Offset: time.Duration(3 * time.Second)}}}, args{time.Now().UTC().Add(1 * time.Second)}, false},
-		{"OK MaxAge", fields{&VerifierConfig{IAT: &IATConfig{MaxAge: time.Duration(6 * time.Minute)}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, false},
-		{"Err in future", fields{&VerifierConfig{IAT: &IATConfig{}}}, args{time.Now().UTC().Add(1 * time.Minute)}, true},
-		{"Err in future with offset", fields{&VerifierConfig{IAT: &IATConfig{Offset: time.Duration(3 * time.Second)}}}, args{time.Now().UTC().Add(10 * time.Second)}, true},
-		{"Err to old with maxage", fields{&VerifierConfig{IAT: &IATConfig{MaxAge: time.Duration(3 * time.Minute)}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, true},
+		{"OK", fields{&verifierConfig{iat: &iatConfig{}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, false},
+		{"OK Ignored", fields{&verifierConfig{iat: &iatConfig{ignore: true}}}, args{time.Now().UTC().Add(5 * time.Minute)}, false},
+		{"OK Offset", fields{&verifierConfig{iat: &iatConfig{offset: time.Duration(3 * time.Second)}}}, args{time.Now().UTC().Add(1 * time.Second)}, false},
+		{"OK MaxAge", fields{&verifierConfig{iat: &iatConfig{maxAge: time.Duration(6 * time.Minute)}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, false},
+		{"Err in future", fields{&verifierConfig{iat: &iatConfig{}}}, args{time.Now().UTC().Add(1 * time.Minute)}, true},
+		{"Err in future with offset", fields{&verifierConfig{iat: &iatConfig{offset: time.Duration(3 * time.Second)}}}, args{time.Now().UTC().Add(10 * time.Second)}, true},
+		{"Err to old with maxage", fields{&verifierConfig{iat: &iatConfig{maxAge: time.Duration(3 * time.Minute)}}}, args{time.Now().UTC().Add(-5 * time.Minute)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -166,7 +166,7 @@ func TestDefaultVerifier_checkIssuedAt(t *testing.T) {
 
 func TestDefaultVerifier_checkNonce(t *testing.T) {
 	type fields struct {
-		config *VerifierConfig
+		config *verifierConfig
 	}
 	type args struct {
 		nonce string
@@ -177,11 +177,11 @@ func TestDefaultVerifier_checkNonce(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OK none", fields{&VerifierConfig{}}, args{""}, false},
-		{"OK nonce", fields{&VerifierConfig{Nonce: "nonce"}}, args{"nonce"}, false},
-		{"OK not checked", fields{&VerifierConfig{Nonce: ""}}, args{"nonce"}, false},
-		{"Err none", fields{&VerifierConfig{Nonce: "nonce"}}, args{""}, true},
-		{"Err wrong", fields{&VerifierConfig{Nonce: "nonce"}}, args{"nonsense"}, true},
+		{"OK none", fields{&verifierConfig{}}, args{""}, false},
+		{"OK nonce", fields{&verifierConfig{nonce: "nonce"}}, args{"nonce"}, false},
+		{"OK not checked", fields{&verifierConfig{nonce: ""}}, args{"nonce"}, false},
+		{"Err none", fields{&verifierConfig{nonce: "nonce"}}, args{""}, true},
+		{"Err wrong", fields{&verifierConfig{nonce: "nonce"}}, args{"nonsense"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -197,7 +197,7 @@ func TestDefaultVerifier_checkNonce(t *testing.T) {
 
 func TestDefaultVerifier_checkAuthorizationContextClassReference(t *testing.T) {
 	type fields struct {
-		config *VerifierConfig
+		config *verifierConfig
 	}
 	type args struct {
 		acr string
@@ -208,9 +208,9 @@ func TestDefaultVerifier_checkAuthorizationContextClassReference(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OK none", fields{&VerifierConfig{}}, args{""}, false},
-		{"OK with verifier", fields{&VerifierConfig{ACR: DefaultACRVerifier([]string{"acr1", "acr2"})}}, args{"acr1"}, false},
-		{"Err invalid", fields{&VerifierConfig{ACR: DefaultACRVerifier([]string{"acr1"})}}, args{"acr2"}, true},
+		{"OK none", fields{&verifierConfig{}}, args{""}, false},
+		{"OK with verifier", fields{&verifierConfig{acr: DefaultACRVerifier([]string{"acr1", "acr2"})}}, args{"acr1"}, false},
+		{"Err invalid", fields{&verifierConfig{acr: DefaultACRVerifier([]string{"acr1"})}}, args{"acr2"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -226,7 +226,7 @@ func TestDefaultVerifier_checkAuthorizationContextClassReference(t *testing.T) {
 
 func TestDefaultVerifier_checkAuthTime(t *testing.T) {
 	type fields struct {
-		config *VerifierConfig
+		config *verifierConfig
 	}
 	type args struct {
 		authTime time.Time
@@ -237,11 +237,11 @@ func TestDefaultVerifier_checkAuthTime(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OK not present", fields{&VerifierConfig{}}, args{}, false},
-		{"OK not checked", fields{&VerifierConfig{}}, args{time.Now().UTC().Add(-1 * time.Minute)}, false},
-		{"OK checked", fields{&VerifierConfig{MaxAge: time.Duration(5 * time.Minute)}}, args{time.Now().UTC().Add(-3 * time.Minute)}, false},
-		{"Err not present", fields{&VerifierConfig{MaxAge: time.Duration(1 * time.Minute)}}, args{}, true},
-		{"Err to old", fields{&VerifierConfig{MaxAge: time.Duration(1 * time.Minute)}}, args{time.Now().UTC().Add(-3 * time.Minute)}, true},
+		{"OK not present", fields{&verifierConfig{}}, args{}, false},
+		{"OK not checked", fields{&verifierConfig{}}, args{time.Now().UTC().Add(-1 * time.Minute)}, false},
+		{"OK checked", fields{&verifierConfig{maxAge: time.Duration(5 * time.Minute)}}, args{time.Now().UTC().Add(-3 * time.Minute)}, false},
+		{"Err not present", fields{&verifierConfig{maxAge: time.Duration(1 * time.Minute)}}, args{}, true},
+		{"Err to old", fields{&verifierConfig{maxAge: time.Duration(1 * time.Minute)}}, args{time.Now().UTC().Add(-3 * time.Minute)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

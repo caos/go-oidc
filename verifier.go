@@ -38,10 +38,10 @@ var (
 		return ValidationError("IssuedAt of token must not be older than %v, but was %v (%v to old)", maxAge, iat, maxAge.Sub(iat))
 	}
 	ErrNonceInvalid = func(expected, actual string) *validationError {
-		return ValidationError("Nonce does not match. Expected: %s, got: %s", expected, actual)
+		return ValidationError("nonce does not match. Expected: %s, got: %s", expected, actual)
 	}
 	ErrAcrInvalid = func(expected []string, actual string) *validationError {
-		return ValidationError("ACR is invalid. Expected one of: %v, got: %s", expected, actual)
+		return ValidationError("acr is invalid. Expected one of: %v, got: %s", expected, actual)
 	}
 
 	ErrAuthTimeNotPresent = func() *validationError {
@@ -57,10 +57,10 @@ type Verifier interface {
 }
 
 func NewDefaultVerifier(issuer, clientID string, confOpts ...confFunc) Verifier {
-	conf := &VerifierConfig{
-		Issuer:   issuer,
-		ClientID: clientID,
-		IAT:      &IATConfig{},
+	conf := &verifierConfig{
+		issuer:   issuer,
+		clientID: clientID,
+		iat:      &iatConfig{},
 	}
 
 	for _, opt := range confOpts {
@@ -72,61 +72,61 @@ func NewDefaultVerifier(issuer, clientID string, confOpts ...confFunc) Verifier 
 }
 
 type DefaultVerifier struct {
-	config *VerifierConfig
+	config *verifierConfig
 }
 
-type confFunc func(*VerifierConfig)
+type confFunc func(*verifierConfig)
 
-func WithIgnoreIssuedAt() func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.IAT.Ignore = true
+func WithIgnoreIssuedAt() func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.iat.ignore = true
 	}
 }
 
-func WithIssuedAtOffset(offset time.Duration) func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.IAT.Offset = offset
+func WithIssuedAtOffset(offset time.Duration) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.iat.offset = offset
 	}
 }
 
-func WithIssuedAtMaxAge(maxAge time.Duration) func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.IAT.MaxAge = maxAge
+func WithIssuedAtMaxAge(maxAge time.Duration) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.iat.maxAge = maxAge
 	}
 }
 
-func WithNonce(nonce string) func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.Nonce = nonce
+func WithNonce(nonce string) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.nonce = nonce
 	}
 }
 
-func WithACRVerifier(verifier ACRVerifier) func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.ACR = verifier
+func WithACRVerifier(verifier ACRVerifier) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.acr = verifier
 	}
 }
 
-func WithAuthTimeMaxAge(maxAge time.Duration) func(*VerifierConfig) {
-	return func(conf *VerifierConfig) {
-		conf.MaxAge = maxAge
+func WithAuthTimeMaxAge(maxAge time.Duration) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.maxAge = maxAge
 	}
 }
 
-type VerifierConfig struct {
-	Issuer   string
-	ClientID string
-	Nonce    string
-	IAT      *IATConfig
-	ACR      ACRVerifier
-	MaxAge   time.Duration
+type verifierConfig struct {
+	issuer   string
+	clientID string
+	nonce    string
+	iat      *iatConfig
+	acr      ACRVerifier
+	maxAge   time.Duration
 	now      time.Time
 }
 
-type IATConfig struct {
-	Ignore bool
-	Offset time.Duration
-	MaxAge time.Duration
+type iatConfig struct {
+	ignore bool
+	offset time.Duration
+	maxAge time.Duration
 }
 
 type ACRVerifier func(string) error
@@ -242,15 +242,15 @@ func (v *validationError) Error() string {
 }
 
 func (v *DefaultVerifier) checkIssuer(issuer string) error {
-	if v.config.Issuer != issuer {
-		return ErrIssuerInvalid(v.config.Issuer, issuer)
+	if v.config.issuer != issuer {
+		return ErrIssuerInvalid(v.config.issuer, issuer)
 	}
 	return nil
 }
 
 func (v *DefaultVerifier) checkAudience(audiences []string) error {
-	if !str_utils.Contains(audiences, v.config.ClientID) {
-		return ErrAudienceMissingClientID(v.config.ClientID)
+	if !str_utils.Contains(audiences, v.config.clientID) {
+		return ErrAudienceMissingClientID(v.config.clientID)
 	}
 
 	//TODO: check aud trusted
@@ -265,8 +265,8 @@ func (v *DefaultVerifier) checkAuthorizedParty(audiences []string, authorizedPar
 			return ErrAzpMissing()
 		}
 	}
-	if authorizedParty != "" && authorizedParty != v.config.ClientID {
-		return ErrAzpInvalid(authorizedParty, v.config.ClientID)
+	if authorizedParty != "" && authorizedParty != v.config.clientID {
+		return ErrAzpInvalid(authorizedParty, v.config.clientID)
 	}
 	return nil
 }
@@ -284,47 +284,47 @@ func (v *DefaultVerifier) checkExpiration(expiration time.Time) error {
 }
 
 func (v *DefaultVerifier) checkIssuedAt(issuedAt time.Time) error {
-	if v.config.IAT.Ignore {
+	if v.config.iat.ignore {
 		return nil
 	}
 	issuedAt = issuedAt.Round(time.Second)
-	offset := v.now().Add(v.config.IAT.Offset).Round(time.Second)
+	offset := v.now().Add(v.config.iat.offset).Round(time.Second)
 	if issuedAt.After(offset) {
 		return ErrIatInFuture(issuedAt, offset)
 	}
-	if v.config.IAT.MaxAge == 0 {
+	if v.config.iat.maxAge == 0 {
 		return nil
 	}
-	maxAge := v.now().Add(-v.config.IAT.MaxAge).Round(time.Second)
+	maxAge := v.now().Add(-v.config.iat.maxAge).Round(time.Second)
 	if issuedAt.Before(maxAge) {
 		return ErrIatToOld(maxAge, issuedAt)
 	}
 	return nil
 }
 func (v *DefaultVerifier) checkNonce(nonce string) error {
-	if v.config.Nonce == "" {
+	if v.config.nonce == "" {
 		return nil
 	}
-	if v.config.Nonce != nonce {
-		return ErrNonceInvalid(v.config.Nonce, nonce)
+	if v.config.nonce != nonce {
+		return ErrNonceInvalid(v.config.nonce, nonce)
 	}
 	return nil
 }
 func (v *DefaultVerifier) checkAuthorizationContextClassReference(acr string) error {
-	if v.config.ACR != nil {
-		return v.config.ACR(acr)
+	if v.config.acr != nil {
+		return v.config.acr(acr)
 	}
 	return nil
 }
 func (v *DefaultVerifier) checkAuthTime(authTime time.Time) error {
-	if v.config.MaxAge == 0 {
+	if v.config.maxAge == 0 {
 		return nil
 	}
 	if authTime.IsZero() {
 		return ErrAuthTimeNotPresent()
 	}
 	authTime = authTime.Round(time.Second)
-	maxAge := v.now().Add(-v.config.MaxAge).Round(time.Second)
+	maxAge := v.now().Add(-v.config.maxAge).Round(time.Second)
 	if authTime.Before(maxAge) {
 		return ErrAuthTimeToOld(maxAge, authTime)
 	}
