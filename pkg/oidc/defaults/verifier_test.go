@@ -1,4 +1,4 @@
-package oidc
+package defaults
 
 import (
 	"testing"
@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createTestVerifier(confOpts ...confFunc) *DefaultVerifier {
-	return NewDefaultVerifier("https://issuer.test/", "test_id", confOpts...).(*DefaultVerifier)
+func createTestVerifier(confOpts ...confFunc) *Verifier {
+	return NewVerifier("https://issuer.test/", "test_id", confOpts...).(*Verifier)
 }
 
 func Test_IDToken_Valid_OK(t *testing.T) {
@@ -154,11 +154,11 @@ func TestDefaultVerifier_checkIssuedAt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &DefaultVerifier{
+			v := &Verifier{
 				config: tt.fields.config,
 			}
 			if err := v.checkIssuedAt(tt.args.issuedAt); (err != nil) != tt.wantErr {
-				t.Errorf("DefaultVerifier.checkIssuedAt() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("verifier.checkIssuedAt() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -185,11 +185,11 @@ func TestDefaultVerifier_checkNonce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &DefaultVerifier{
+			v := &Verifier{
 				config: tt.fields.config,
 			}
 			if err := v.checkNonce(tt.args.nonce); (err != nil) != tt.wantErr {
-				t.Errorf("DefaultVerifier.checkNonce() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("verifier.checkNonce() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -214,11 +214,11 @@ func TestDefaultVerifier_checkAuthorizationContextClassReference(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &DefaultVerifier{
+			v := &Verifier{
 				config: tt.fields.config,
 			}
 			if err := v.checkAuthorizationContextClassReference(tt.args.acr); (err != nil) != tt.wantErr {
-				t.Errorf("DefaultVerifier.checkAuthorizationContextClassReference() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("verifier.checkAuthorizationContextClassReference() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -245,11 +245,11 @@ func TestDefaultVerifier_checkAuthTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &DefaultVerifier{
+			v := &Verifier{
 				config: tt.fields.config,
 			}
 			if err := v.checkAuthTime(tt.args.authTime); (err != nil) != tt.wantErr {
-				t.Errorf("DefaultVerifier.checkAuthTime() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("verifier.checkAuthTime() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -1,6 +1,10 @@
 package oidc
 
-import "time"
+import (
+	"time"
+
+	"gopkg.in/square/go-jose.v2"
+)
 
 type IDToken struct {
 	Issuer                              string    `json:"iss,omitempty"`
@@ -13,4 +17,7 @@ type IDToken struct {
 	AuthenticationContextClassReference string    `json:"acr,omitempty"`
 	AuthenticationMethodsReferences     []string  `json:"amr,omitempty"`
 	AuthorizedParty                     string    `json:"azp,omitempty"`
+
+	AtHash    string                  `json:"at_hash,omitempty"`
+	Signature jose.SignatureAlgorithm //TODO: ???
 }

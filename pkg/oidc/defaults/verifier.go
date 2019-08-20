@@ -1,4 +1,4 @@
-package oidc
+package defaults
 
 import (
 	"crypto/sha256"
@@ -12,10 +12,11 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 
+	"github.com/caos/go-oidc/pkg/oidc"
 	str_utils "github.com/caos/utils/strings"
 )
 
-func NewDefaultVerifier(issuer, clientID string, confOpts ...confFunc) Verifier {
+func NewVerifier(issuer, clientID string, confOpts ...confFunc) oidc.Verifier {
 	conf := &verifierConfig{
 		issuer:   issuer,
 		clientID: clientID,
@@ -27,10 +28,10 @@ func NewDefaultVerifier(issuer, clientID string, confOpts ...confFunc) Verifier 
 			opt(conf)
 		}
 	}
-	return &DefaultVerifier{config: conf}
+	return &Verifier{config: conf}
 }
 
-type DefaultVerifier struct {
+type Verifier struct {
 	config *verifierConfig
 }
 
@@ -99,83 +100,90 @@ func DefaultACRVerifier(possibleValues []string) func(string) error {
 	}
 }
 
-func (v *DefaultVerifier) Verify(accessToken, idToken string) error {
+func (v *Verifier) Verify(accessToken, idTokenString string) error {
 	v.config.now = time.Now().UTC()
+	idToken, err := v.VerifyIDToken(idTokenString)
+	if err != nil {
+		return err
+	}
+	if err := v.verifyAccessToken(accessToken, idToken.AtHash, idToken.Signature); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (v *DefaultVerifier) now() time.Time {
+func (v *Verifier) now() time.Time {
 	if v.config.now.IsZero() {
 		v.config.now = time.Now().UTC().Round(time.Second)
 	}
 	return v.config.now
 }
 
-func (v *DefaultVerifier) verifyIDToken(idTokenString string) error {
+func (v *Verifier) VerifyIDToken(idTokenString string) (*oidc.IDToken, error) {
 	//1. if encrypted --> decrypt
 	decrypted, err := v.decryptToken(idTokenString)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	claims, err := v.parseToken(decrypted)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// token, err := jwt.ParseWithClaims(decrypted, claims, func(token *jwt.Token) (interface{}, error) {
 	//2, check issuer (exact match)
 	if err := v.checkIssuer(claims.Issuer); err != nil {
-		return err
+		return nil, err
 	}
 
 	//3. check aud (aud must contain client_id, all aud strings must be allowed)
 	if err = v.checkAudience(claims.Audiences); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = v.checkAuthorizedParty(claims.Audiences, claims.AuthorizedParty); err != nil {
-		return err
+		return nil, err
 	}
 
 	//6. check signature by keys
 	//7. check alg default is rs256
 	//8. check if alg is mac based (hs...) -> audience contains client_id. for validation use utf-8 representation of your client_secret
 	if err = v.checkSignature(claims); err != nil {
-		return err
+		return nil, err
 	}
 
 	//9. check exp before now
 	if err = v.checkExpiration(claims.Expiration); err != nil {
-		return err
+		return nil, err
 	}
 
 	//10. check iat duration is optional (can be checked)
 	if err = v.checkIssuedAt(claims.IssuedAt); err != nil {
-		return err
+		return nil, err
 	}
 
 	//11. check nonce (check if optional possible) id_token.nonce == sentNonce
 	if err = v.checkNonce(claims.Nonce); err != nil {
-		return err
+		return nil, err
 	}
 
 	//12. if acr requested check acr
 	if err = v.checkAuthorizationContextClassReference(claims.AuthenticationContextClassReference); err != nil {
-		return err
+		return nil, err
 	}
 
 	//13. if auth_time requested check if auth_time is less than max age
 	if err = v.checkAuthTime(claims.AuthTime); err != nil {
-		return err
+		return nil, err
 	}
 	//return idtoken struct, err
 
-	return nil
+	return nil, nil
 	// })
 	// _ = token
 	// return err
 }
 
-func (v *DefaultVerifier) parseToken(tokenString string) (idToken *IDToken, err error) {
+func (v *Verifier) parseToken(tokenString string) (idToken *oidc.IDToken, err error) {
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
 		return nil, nil //TODO: err NewValidationError("token contains an invalid number of segments", ValidationErrorMalformed)
@@ -188,14 +196,14 @@ func (v *DefaultVerifier) parseToken(tokenString string) (idToken *IDToken, err 
 	return idToken, err
 }
 
-func (v *DefaultVerifier) checkIssuer(issuer string) error {
+func (v *Verifier) checkIssuer(issuer string) error {
 	if v.config.issuer != issuer {
 		return ErrIssuerInvalid(v.config.issuer, issuer)
 	}
 	return nil
 }
 
-func (v *DefaultVerifier) checkAudience(audiences []string) error {
+func (v *Verifier) checkAudience(audiences []string) error {
 	if !str_utils.Contains(audiences, v.config.clientID) {
 		return ErrAudienceMissingClientID(v.config.clientID)
 	}
@@ -206,7 +214,7 @@ func (v *DefaultVerifier) checkAudience(audiences []string) error {
 
 //4. if multiple aud strings --> check if azp
 //5. if azp --> check azp == client_id
-func (v *DefaultVerifier) checkAuthorizedParty(audiences []string, authorizedParty string) error {
+func (v *Verifier) checkAuthorizedParty(audiences []string, authorizedParty string) error {
 	if len(audiences) > 1 {
 		if authorizedParty == "" {
 			return ErrAzpMissing()
@@ -218,11 +226,11 @@ func (v *DefaultVerifier) checkAuthorizedParty(audiences []string, authorizedPar
 	return nil
 }
 
-func (v *DefaultVerifier) checkSignature(claims *IDToken) error {
+func (v *Verifier) checkSignature(claims *oidc.IDToken) error {
 	return nil
 }
 
-func (v *DefaultVerifier) checkExpiration(expiration time.Time) error {
+func (v *Verifier) checkExpiration(expiration time.Time) error {
 	expiration = expiration.Round(time.Second)
 	if !v.now().Before(expiration) {
 		return ErrExpInvalid(expiration)
@@ -230,7 +238,7 @@ func (v *DefaultVerifier) checkExpiration(expiration time.Time) error {
 	return nil
 }
 
-func (v *DefaultVerifier) checkIssuedAt(issuedAt time.Time) error {
+func (v *Verifier) checkIssuedAt(issuedAt time.Time) error {
 	if v.config.iat.ignore {
 		return nil
 	}
@@ -248,7 +256,7 @@ func (v *DefaultVerifier) checkIssuedAt(issuedAt time.Time) error {
 	}
 	return nil
 }
-func (v *DefaultVerifier) checkNonce(nonce string) error {
+func (v *Verifier) checkNonce(nonce string) error {
 	if v.config.nonce == "" {
 		return nil
 	}
@@ -257,13 +265,13 @@ func (v *DefaultVerifier) checkNonce(nonce string) error {
 	}
 	return nil
 }
-func (v *DefaultVerifier) checkAuthorizationContextClassReference(acr string) error {
+func (v *Verifier) checkAuthorizationContextClassReference(acr string) error {
 	if v.config.acr != nil {
 		return v.config.acr(acr)
 	}
 	return nil
 }
-func (v *DefaultVerifier) checkAuthTime(authTime time.Time) error {
+func (v *Verifier) checkAuthTime(authTime time.Time) error {
 	if v.config.maxAge == 0 {
 		return nil
 	}
@@ -278,11 +286,11 @@ func (v *DefaultVerifier) checkAuthTime(authTime time.Time) error {
 	return nil
 }
 
-func (v *DefaultVerifier) decryptToken(tokenString string) (string, error) {
+func (v *Verifier) decryptToken(tokenString string) (string, error) {
 	return tokenString, nil //TODO: impl
 }
 
-// func (v *DefaultVerifier) parseIDToken(tokenString string) (IDToken, error) {
+// func (v *Verifier) parseIDToken(tokenString string) (IDToken, error) {
 // 	var claims jwt.StandardClaims
 // 	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
 // 		claims.VerifyIssuer(v.config.Issuer, true)
@@ -301,7 +309,7 @@ func (v *DefaultVerifier) decryptToken(tokenString string) (string, error) {
 // 	return token, nil //TODO: impl
 // }
 
-func (v *DefaultVerifier) verifyAccessToken(accessToken, atHash string, sigAlgorithm jose.SignatureAlgorithm) error {
+func (v *Verifier) verifyAccessToken(accessToken, atHash string, sigAlgorithm jose.SignatureAlgorithm) error {
 	if atHash == "" {
 		return nil //TODO: return error
 	}

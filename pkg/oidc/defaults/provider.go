@@ -1,4 +1,4 @@
-package oidc
+package defaults
 
 import (
 	"context"
@@ -8,20 +8,21 @@ import (
 	"golang.org/x/oauth2"
 
 	oidc_http "github.com/caos/go-oidc/http"
+	"github.com/caos/go-oidc/pkg/oidc"
 )
 
 type DefaultProvider struct {
-	endpoints Endpoints
+	endpoints oidc.Endpoints
 
 	oauthConfig oauth2.Config
-	config      ProviderConfig
+	config      oidc.ProviderConfig
 
 	httpClient *http.Client
 
-	verifier Verifier
+	verifier oidc.Verifier
 }
 
-func NewDefaultProvider(providerConfig ProviderConfig, providerOptions ...ProviderOptionFunc) (Provider, error) {
+func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...oidc.ProviderOptionFunc) (oidc.Provider, error) {
 	p := &DefaultProvider{
 		config:     providerConfig,
 		httpClient: oidc_http.DefaultHTTPClient,
@@ -69,15 +70,15 @@ func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
 }
 
 func (p *DefaultProvider) discover() error {
-	wellKnown := strings.TrimSuffix(p.config.Issuer, "/") + DiscoveryEndpoint
+	wellKnown := strings.TrimSuffix(p.config.Issuer, "/") + oidc.DiscoveryEndpoint
 
-	oidcConfig := OidcConfiguration{}
+	oidcConfig := oidc.OidcConfiguration{}
 	err := oidc_http.Get(wellKnown, &oidcConfig, p.httpClient)
 	if err != nil {
 		return err
 	}
 
-	p.endpoints = oidcConfig.getEndpoints()
+	p.endpoints = oidcConfig.GetEndpoints()
 	p.oauthConfig = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: p.config.ClientSecret,

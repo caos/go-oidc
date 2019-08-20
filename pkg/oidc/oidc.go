@@ -25,7 +25,7 @@ type OidcConfiguration struct {
 	ClaimsSupported                   []string `json:"claims_supported,omitempty"`
 }
 
-func (oidcConf *OidcConfiguration) getEndpoints() Endpoints {
+func (oidcConf *OidcConfiguration) GetEndpoints() Endpoints {
 	return Endpoints{
 		Endpoint: oauth2.Endpoint{
 			AuthURL:   oidcConf.AuthorizationEndpoint,
