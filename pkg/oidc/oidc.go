@@ -34,6 +34,6 @@ func (oidcConf *OidcConfiguration) GetEndpoints() Endpoints {
 		},
 		IntrospectURL: oidcConf.IntrospectionEndpoint,
 		UserinfoURL:   oidcConf.UserinfoEndpoint,
-		jkwsURL:       oidcConf.JwksURI,
+		JKWsURL:       oidcConf.JwksURI,
 	}
 }

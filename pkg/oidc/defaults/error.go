@@ -40,6 +40,9 @@ var (
 	ErrAuthTimeToOld = func(maxAge, authTime time.Time) *validationError {
 		return ValidationError("Auth Time of token must not be older than %v, but was %v (%v to old)", maxAge, authTime, maxAge.Sub(authTime))
 	}
+	ErrSignatureInvalidPayload = func() *validationError {
+		return ValidationError("Signature does not match Payload")
+	}
 )
 
 func ValidationError(message string, args ...interface{}) *validationError {

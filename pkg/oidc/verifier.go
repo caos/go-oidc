@@ -1,5 +1,7 @@
 package oidc
 
+import "context"
+
 type Verifier interface {
-	Verify(accessToken, idToken string) error
+	Verify(ctx context.Context, accessToken, idToken string) error
 }

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/caos/go-oidc/pkg/oidc/utils"
+
 	"golang.org/x/oauth2"
 
 	oidc_http "github.com/caos/go-oidc/http"
@@ -36,32 +38,50 @@ func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...o
 		return nil, err
 	}
 
+	if p.verifier == nil {
+		p.verifier = NewVerifier(providerConfig.Issuer, providerConfig.ClientID, utils.NewRemoteKeySet(p.httpClient, p.endpoints.JKWsURL)) //TODO: keys endpoint
+	}
+
 	return p, nil
 }
 
 const idTokenKey = "id_token"
 
-func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (accessToken string, err error) {
-	token, err := p.oauthConfig.Exchange(ctx, code)
+func (p *DefaultProvider) AuthURL(state string) string {
+	return p.oauthConfig.AuthCodeURL(state)
+}
+
+func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (token *oauth2.Token, err error) {
+	token, err = p.oauthConfig.Exchange(ctx, code)
 	if err != nil {
-		return "", err //TODO: our error
+		return nil, err //TODO: our error
 	}
 	idTokenString, ok := token.Extra(idTokenKey).(string)
 	if !ok {
 		//TODO: implement
 	}
 
-	if err := p.verifier.Verify(token.AccessToken, idTokenString); err != nil {
-		return "", err //TODO: err
+	if err := p.verifier.Verify(ctx, token.AccessToken, idTokenString); err != nil {
+		return nil, err //TODO: err
 	}
 
-	return token.AccessToken, nil
+	return token, nil
 }
 
 func (p *DefaultProvider) Authorize(ctx context.Context, accessToken string) {
 	p.oauthConfig.TokenSource(ctx, &oauth2.Token{AccessToken: accessToken})
 }
 func (p *DefaultProvider) Userinfo() {}
+
+func (p *DefaultProvider) TokenExchange(ctx context.Context, request oidc.TokenExchangeRequest) (newToken *oauth2.Token, err error) {
+	// p.oauthConfig.Endpoint.TokenURL
+	return nil, nil
+}
+
+func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...DelReqOpts) (newToken *oauth2.Token, err error) {
+	delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
+	return p.TokenExchange(ctx, delRequest)
+}
 
 func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
 	return func(o *DefaultProvider) {

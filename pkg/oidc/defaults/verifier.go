@@ -1,6 +1,8 @@
 package defaults
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -16,7 +18,7 @@ import (
 	str_utils "github.com/caos/utils/strings"
 )
 
-func NewVerifier(issuer, clientID string, confOpts ...confFunc) oidc.Verifier {
+func NewVerifier(issuer, clientID string, keySet oidc.KeySet, confOpts ...ConfFunc) oidc.Verifier {
 	conf := &verifierConfig{
 		issuer:   issuer,
 		clientID: clientID,
@@ -28,14 +30,15 @@ func NewVerifier(issuer, clientID string, confOpts ...confFunc) oidc.Verifier {
 			opt(conf)
 		}
 	}
-	return &Verifier{config: conf}
+	return &Verifier{config: conf, keySet: keySet}
 }
 
 type Verifier struct {
 	config *verifierConfig
+	keySet oidc.KeySet
 }
 
-type confFunc func(*verifierConfig)
+type ConfFunc func(*verifierConfig)
 
 func WithIgnoreIssuedAt() func(*verifierConfig) {
 	return func(conf *verifierConfig) {
@@ -73,14 +76,30 @@ func WithAuthTimeMaxAge(maxAge time.Duration) func(*verifierConfig) {
 	}
 }
 
+func WithSupportedSigningAlgorithms(algs ...string) func(*verifierConfig) {
+	return func(conf *verifierConfig) {
+		conf.supportedSignAlgs = algs
+	}
+}
+
+// func WithVerifierHTTPClient(client *http.Client) func(*verifierConfig) {
+// 	return func(conf *verifierConfig) {
+// 		conf.httpClient = client
+// 	}
+// }
+
 type verifierConfig struct {
-	issuer   string
-	clientID string
-	nonce    string
-	iat      *iatConfig
-	acr      ACRVerifier
-	maxAge   time.Duration
-	now      time.Time
+	issuer            string
+	clientID          string
+	nonce             string
+	iat               *iatConfig
+	acr               ACRVerifier
+	maxAge            time.Duration
+	supportedSignAlgs []string
+
+	// httpClient *http.Client
+
+	now time.Time
 }
 
 type iatConfig struct {
@@ -100,13 +119,13 @@ func DefaultACRVerifier(possibleValues []string) func(string) error {
 	}
 }
 
-func (v *Verifier) Verify(accessToken, idTokenString string) error {
+func (v *Verifier) Verify(ctx context.Context, accessToken, idTokenString string) error {
 	v.config.now = time.Now().UTC()
-	idToken, err := v.VerifyIDToken(idTokenString)
+	idToken, err := v.VerifyIDToken(ctx, idTokenString)
 	if err != nil {
 		return err
 	}
-	if err := v.verifyAccessToken(accessToken, idToken.AtHash, idToken.Signature); err != nil {
+	if err := v.verifyAccessToken(accessToken, idToken.AccessTokenHash, idToken.Signature); err != nil { //TODO: sig from token
 		return err
 	}
 	return nil
@@ -119,13 +138,13 @@ func (v *Verifier) now() time.Time {
 	return v.config.now
 }
 
-func (v *Verifier) VerifyIDToken(idTokenString string) (*oidc.IDToken, error) {
+func (v *Verifier) VerifyIDToken(ctx context.Context, idTokenString string) (*oidc.IDToken, error) {
 	//1. if encrypted --> decrypt
 	decrypted, err := v.decryptToken(idTokenString)
 	if err != nil {
 		return nil, err
 	}
-	claims, err := v.parseToken(decrypted)
+	claims, payload, err := v.parseToken(decrypted)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +166,8 @@ func (v *Verifier) VerifyIDToken(idTokenString string) (*oidc.IDToken, error) {
 	//6. check signature by keys
 	//7. check alg default is rs256
 	//8. check if alg is mac based (hs...) -> audience contains client_id. for validation use utf-8 representation of your client_secret
-	if err = v.checkSignature(claims); err != nil {
+	claims.Signature, err = v.checkSignature(ctx, decrypted, payload)
+	if err != nil {
 		return nil, err
 	}
 
@@ -177,23 +197,24 @@ func (v *Verifier) VerifyIDToken(idTokenString string) (*oidc.IDToken, error) {
 	}
 	//return idtoken struct, err
 
-	return nil, nil
+	return claims, nil
 	// })
 	// _ = token
 	// return err
 }
 
-func (v *Verifier) parseToken(tokenString string) (idToken *oidc.IDToken, err error) {
+func (v *Verifier) parseToken(tokenString string) (*oidc.IDToken, []byte, error) {
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
-		return nil, nil //TODO: err NewValidationError("token contains an invalid number of segments", ValidationErrorMalformed)
+		return nil, nil, ValidationError("token contains an invalid number of segments") //TODO: err NewValidationError("token contains an invalid number of segments", ValidationErrorMalformed)
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt payload: %v", err)
+		return nil, nil, fmt.Errorf("oidc: malformed jwt payload: %v", err)
 	}
+	idToken := new(oidc.IDToken)
 	err = json.Unmarshal(payload, idToken)
-	return idToken, err
+	return idToken, payload, err
 }
 
 func (v *Verifier) checkIssuer(issuer string) error {
@@ -226,9 +247,99 @@ func (v *Verifier) checkAuthorizedParty(audiences []string, authorizedParty stri
 	return nil
 }
 
-func (v *Verifier) checkSignature(claims *oidc.IDToken) error {
-	return nil
+func (v *Verifier) checkSignature(ctx context.Context, idTokenString string, payload []byte) (jose.SignatureAlgorithm, error) {
+	jws, err := jose.ParseSigned(idTokenString)
+	if err != nil {
+		return "", err
+	}
+	if len(jws.Signatures) == 0 {
+		return "", nil //TODO: error
+	}
+	if len(jws.Signatures) > 1 {
+		return "", nil //TODO: error
+	}
+	sig := jws.Signatures[0]
+	supportedSigAlgs := v.config.supportedSignAlgs
+	if len(supportedSigAlgs) == 0 {
+		supportedSigAlgs = []string{"RS256"}
+	}
+	if !str_utils.Contains(supportedSigAlgs, sig.Header.Algorithm) {
+		return "", fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
+	}
+
+	signedPayload, err := v.keySet.VerifySignature(ctx, jws)
+	if err != nil {
+		return "", err
+		//TODO:
+	}
+
+	if !bytes.Equal(signedPayload, payload) {
+		return "", ErrSignatureInvalidPayload() //TODO: err
+	}
+	return jose.SignatureAlgorithm(sig.Header.Algorithm), nil
 }
+
+// type KeySet struct {
+// 	remoteURL  url.URL
+// 	httpClient *http.Client
+// 	keys       []jose.JSONWebKey
+
+// 	m        sync.Mutex
+// 	inflight *inflight
+// }
+
+// func (k *KeySet) GetKey(ctx context.Context, keyID string) (*jose.JSONWebKey, error) {
+// 	key, err := k.getKey(keyID)
+// 	if err != nil {
+// 		//lock
+// 		k.updateKeys(ctx)
+// 		//unlock
+// 		return k.getKey(keyID)
+// 	}
+// 	return key, nil
+// }
+
+// func (k *KeySet) getKey(keyID string) (*jose.JSONWebKey, error) {
+// 	k.m.Lock()
+// 	keys := k.keys
+// 	k.m.Unlock()
+// 	for _, key := range keys {
+// 		if key.KeyID == keyID {
+// 			return &key, nil
+// 		}
+// 	}
+// 	return nil, nil //TODO: err
+// }
+
+// func (k *KeySet) retrieveNewKeys(ctx context.Context) ([]jose.JSONWebKey, error) {
+// 	resp, err := k.httpClient.Get(k.remoteURL.String())
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if resp.StatusCode != http.StatusOK {
+// 		return nil, nil //TODO: errs
+// 	}
+
+// 	defer resp.Body.Close()
+// 	body, err := ioutil.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var keySet jose.JSONWebKeySet
+// 	err = json.Unmarshal(body, keySet)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return keySet.Keys, nil
+// }
+
+// func (k *KeySet) updateKeys(ctx context.Context) error {
+// 	k.inflight
+// 	k.m.Lock()
+// 	k.keys = keySet.Keys
+// 	return nil
+// }
 
 func (v *Verifier) checkExpiration(expiration time.Time) error {
 	expiration = expiration.Round(time.Second)
