@@ -21,7 +21,8 @@ type DefaultProvider struct {
 
 	httpClient *http.Client
 
-	verifier oidc.Verifier
+	verifier       oidc.Verifier
+	verifierConfig []ConfFunc
 }
 
 func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...oidc.ProviderOptionFunc) (oidc.Provider, error) {
@@ -39,10 +40,19 @@ func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...o
 	}
 
 	if p.verifier == nil {
-		p.verifier = NewVerifier(providerConfig.Issuer, providerConfig.ClientID, utils.NewRemoteKeySet(p.httpClient, p.endpoints.JKWsURL)) //TODO: keys endpoint
+		p.verifier = NewVerifier(providerConfig.Issuer, providerConfig.ClientID, utils.NewRemoteKeySet(p.httpClient, p.endpoints.JKWsURL), p.verifierConfig...) //TODO: keys endpoint
 	}
 
 	return p, nil
+}
+
+func WithVerifierConfig(verifierConf ...ConfFunc) oidc.ProviderOptionFunc {
+	return oidc.ProviderOptionFunc(func(p oidc.Provider) {
+		prov, ok := p.(*DefaultProvider)
+		if ok {
+			prov.verifierConfig = verifierConf
+		}
+	})
 }
 
 const idTokenKey = "id_token"
@@ -51,8 +61,8 @@ func (p *DefaultProvider) AuthURL(state string) string {
 	return p.oauthConfig.AuthCodeURL(state)
 }
 
-func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (token *oauth2.Token, err error) {
-	token, err = p.oauthConfig.Exchange(ctx, code)
+func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (tokens *oidc.Tokens, err error) {
+	token, err := p.oauthConfig.Exchange(ctx, code)
 	if err != nil {
 		return nil, err //TODO: our error
 	}
@@ -61,11 +71,12 @@ func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (token 
 		//TODO: implement
 	}
 
-	if err := p.verifier.Verify(ctx, token.AccessToken, idTokenString); err != nil {
+	idToken, err := p.verifier.Verify(ctx, token.AccessToken, idTokenString)
+	if err != nil {
 		return nil, err //TODO: err
 	}
 
-	return token, nil
+	return &oidc.Tokens{Token: token, IDTokenClaims: idToken}, nil
 }
 
 func (p *DefaultProvider) Authorize(ctx context.Context, accessToken string) {

@@ -9,7 +9,7 @@ import (
 
 type Provider interface {
 	AuthURL(state string) string
-	CodeExchange(context.Context, string) (*oauth2.Token, error)
+	CodeExchange(context.Context, string) (*Tokens, error)
 	Authorize(ctx context.Context, accessToken string) //TODO: ???
 	Userinfo()
 }

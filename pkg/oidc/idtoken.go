@@ -80,7 +80,7 @@ type jsonIDToken struct {
 
 type Tokens struct {
 	*oauth2.Token
-	IDToken
+	IDTokenClaims *IDToken
 }
 
 // func (t *jsonIDToken) IDToken() *IDToken {

@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-
-	"golang.org/x/oauth2"
+	"time"
 
 	"github.com/caos/go-oidc/pkg/oidc"
 	"github.com/caos/go-oidc/pkg/oidc/defaults"
@@ -30,7 +29,7 @@ func main() {
 		CallbackURL:  "http://localhost:5556" + callbackPath,
 		Scopes:       []string{"openid", "profile", "email"},
 	}
-	provider, err := defaults.NewDefaultProvider(providerConfig)
+	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithVerifierConfig(defaults.WithIssuedAtOffset(1*time.Second)))
 	logging.Log("APP-nx6PeF").OnError(err).Panic("error creating provider")
 
 	state := "foobar"
@@ -40,21 +39,12 @@ func main() {
 	})
 
 	http.HandleFunc(callbackPath, func(w http.ResponseWriter, r *http.Request) {
-		token, err := provider.CodeExchange(ctx, r.URL.Query().Get("code"))
+		tokens, err := provider.CodeExchange(ctx, r.URL.Query().Get("code"))
 		if err != nil {
 			http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		tokens := struct {
-			*oauth2.Token
-			IDToken string        `json:"id_token"`
-			Claims  *oidc.IDToken `json:"claims"`
-		}{
-			token,
-			token.Extra("id_token").(string),
-			token.Extra("id_token").(string),
-		}
 		data, err := json.Marshal(tokens)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

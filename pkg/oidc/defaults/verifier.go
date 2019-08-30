@@ -119,16 +119,16 @@ func DefaultACRVerifier(possibleValues []string) func(string) error {
 	}
 }
 
-func (v *Verifier) Verify(ctx context.Context, accessToken, idTokenString string) error {
+func (v *Verifier) Verify(ctx context.Context, accessToken, idTokenString string) (*oidc.IDToken, error) {
 	v.config.now = time.Now().UTC()
 	idToken, err := v.VerifyIDToken(ctx, idTokenString)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := v.verifyAccessToken(accessToken, idToken.AccessTokenHash, idToken.Signature); err != nil { //TODO: sig from token
-		return err
+		return nil, err
 	}
-	return nil
+	return idToken, nil
 }
 
 func (v *Verifier) now() time.Time {
