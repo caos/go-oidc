@@ -62,8 +62,9 @@ func main() {
 		if !ok {
 			return
 		}
-		defautlProv := provider.(*defaults.DefaultProvider)
-		tokens, err := defautlProv.ObTokenExchange(r.Context(), token, "Hodor")
+		tokens, err := provider.TokenExchange(r.Context(), oidc.NewTokenExchangeRequest(token, oidc.AccessTokenType, oidc.WithResource([]string{"Test"})))
+		// defautlProv := provider.(*defaults.DefaultProvider)
+		// tokens, err := defautlProv.DelegationTokenExchange(r.Context(), token, "Test")
 		if err != nil {
 			http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
 			return

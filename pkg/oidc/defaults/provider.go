@@ -11,13 +11,11 @@ import (
 	"strings"
 
 	"github.com/gorilla/schema"
-
-	"github.com/caos/go-oidc/pkg/oidc/utils"
-
 	"golang.org/x/oauth2"
 
 	oidc_http "github.com/caos/go-oidc/http"
 	"github.com/caos/go-oidc/pkg/oidc"
+	"github.com/caos/go-oidc/pkg/oidc/utils"
 )
 
 type DefaultProvider struct {
@@ -32,7 +30,7 @@ type DefaultProvider struct {
 	verifierConfig []ConfFunc
 }
 
-func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...oidc.ProviderOptionFunc) (oidc.Provider, error) {
+func NewDefaultProvider(providerConfig oidc.ProviderConfig, providerOptions ...oidc.ProviderOptionFunc) (oidc.ProviderTokenExchange, error) {
 	p := &DefaultProvider{
 		config:     providerConfig,
 		httpClient: oidc_http.DefaultHTTPClient,
@@ -155,10 +153,6 @@ func httpRequest(client *http.Client, req *http.Request, response interface{}) e
 
 func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...oidc.TokenExchangeOption) (newToken *oauth2.Token, err error) {
 	return p.TokenExchange(ctx, DelegationTokenRequest(subjectToken, reqOpts...))
-}
-
-func (p *DefaultProvider) ObTokenExchange(ctx context.Context, subjectToken string, resource string) (newToken *oauth2.Token, err error) {
-	return p.TokenExchange(ctx, ObTokenRequest(subjectToken, resource))
 }
 
 func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {

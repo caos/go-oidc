@@ -1,7 +1,5 @@
 package oidc
 
-import "net/url"
-
 const (
 	AccessTokenType     = "urn:ietf:params:oauth:token-type:access_token"
 	RefreshTokenType    = "urn:ietf:params:oauth:token-type:refresh_token"
@@ -13,22 +11,23 @@ const (
 )
 
 type TokenExchangeRequest struct {
-	grantType          string    `schema:"grant_type"`
-	subjectToken       string    `schema:"subject_token"`
-	subjectTokenType   string    `schema:"subject_token_type"`
-	actorToken         string    `schema:"actor_token"`
-	actorTokenType     string    `schema:"actor_token_type"`
-	resource           []url.URL `schema:"-"` //TODO: uri
-	audience           []string  `schema:"resource"`
-	scope              []string  `schema:"scope"`
-	requestedTokenType string    `schema:"requested_token_type"`
+	grantType          string   `schema:"grant_type"`
+	subjectToken       string   `schema:"subject_token"`
+	subjectTokenType   string   `schema:"subject_token_type"`
+	actorToken         string   `schema:"actor_token"`
+	actorTokenType     string   `schema:"actor_token_type"`
+	resource           []string `schema:"resource"` //TODO: uri
+	audience           []string `schema:"audience"`
+	scope              []string `schema:"scope"`
+	requestedTokenType string   `schema:"requested_token_type"`
 }
 
 func NewTokenExchangeRequest(subjectToken, subjectTokenType string, opts ...TokenExchangeOption) *TokenExchangeRequest {
 	t := &TokenExchangeRequest{
-		grantType:        TokenExchangeGrantType,
-		subjectToken:     subjectToken,
-		subjectTokenType: subjectTokenType,
+		grantType:          TokenExchangeGrantType,
+		subjectToken:       subjectToken,
+		subjectTokenType:   subjectTokenType,
+		requestedTokenType: AccessTokenType,
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -63,7 +62,7 @@ func WithRequestedTokenType(tokenType string) func(*TokenExchangeRequest) {
 	}
 }
 
-func WithResource(resource []url.URL) func(*TokenExchangeRequest) {
+func WithResource(resource []string) func(*TokenExchangeRequest) {
 	return func(req *TokenExchangeRequest) {
 		req.resource = resource
 	}
