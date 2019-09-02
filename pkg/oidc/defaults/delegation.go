@@ -17,9 +17,10 @@ type DelegationTokenRequest struct {
 	// scope        []string  `schema:"scope"`
 }
 
-func NewDelegationTokenRequest(subjectToken string, resource []string) *DelegationTokenRequest {
+func NewDelegationTokenRequest(subjectToken string, opts ...oidc.TokenExchangeOption) *DelegationTokenRequest {
+	// opts = append(opts, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token"))
 	req := &DelegationTokenRequest{
-		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token")),
+		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, opts...),
 	}
 	return req
 }

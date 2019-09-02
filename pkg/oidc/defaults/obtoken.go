@@ -43,9 +43,9 @@ type obTokenRequest struct {
 // 	}
 // }
 
-func NewObTokenRequest(subjectToken string, resource []string) *obTokenRequest {
+func NewObTokenRequest(subjectToken string, resource string) *obTokenRequest {
 	req := &obTokenRequest{
-		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token"), oidc.WithAudience(resource)),
+		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token"), oidc.WithAudience([]string{resource})),
 	}
 	return req
 }

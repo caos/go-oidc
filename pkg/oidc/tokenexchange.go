@@ -38,21 +38,28 @@ func NewTokenExchangeRequest(subjectToken, subjectTokenType string, opts ...Toke
 
 type TokenExchangeOption func(*TokenExchangeRequest)
 
-func WithGrantType(grantType string) TokenExchangeOption {
-	return func(req *TokenExchangeRequest) {
-		req.grantType = grantType
-	}
-}
-
-func WithActorToken(token string) func(*TokenExchangeRequest) {
+func WithActorToken(token, tokenType string) func(*TokenExchangeRequest) {
 	return func(req *TokenExchangeRequest) {
 		req.actorToken = token
+		req.actorTokenType = tokenType
 	}
 }
 
 func WithAudience(audience []string) func(*TokenExchangeRequest) {
 	return func(req *TokenExchangeRequest) {
 		req.audience = audience
+	}
+}
+
+func WithGrantType(grantType string) TokenExchangeOption {
+	return func(req *TokenExchangeRequest) {
+		req.grantType = grantType
+	}
+}
+
+func WithRequestedTokenType(tokenType string) func(*TokenExchangeRequest) {
+	return func(req *TokenExchangeRequest) {
+		req.requestedTokenType = tokenType
 	}
 }
 

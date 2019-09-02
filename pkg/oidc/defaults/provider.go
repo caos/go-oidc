@@ -102,17 +102,10 @@ func (p *DefaultProvider) Authorize(ctx context.Context, accessToken string) {
 func (p *DefaultProvider) Userinfo() {}
 
 func (p *DefaultProvider) TokenExchange(ctx context.Context, request *oidc.TokenExchangeRequest) (newToken *oauth2.Token, err error) {
-	form := make(map[string][]string)
-	encoder := schema.NewEncoder()
-	if err := encoder.Encode(request, form); err != nil {
-		return nil, err
-	}
-	body := strings.NewReader(url.Values(form).Encode())
-	req, err := http.NewRequest("POST", p.endpoints.TokenURL, body)
+	req, err := formRequest(p.endpoints.TokenURL, request)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	auth := base64.StdEncoding.EncodeToString([]byte(p.config.ClientID + ":" + p.config.ClientSecret))
 	req.Header.Set("Authorization", "Basic "+auth)
 	token := new(oauth2.Token)
@@ -120,6 +113,21 @@ func (p *DefaultProvider) TokenExchange(ctx context.Context, request *oidc.Token
 		return nil, err
 	}
 	return token, nil
+}
+
+func formRequest(endpoint string, request interface{}) (*http.Request, error) {
+	form := make(map[string][]string)
+	encoder := schema.NewEncoder()
+	if err := encoder.Encode(request, form); err != nil {
+		return nil, err
+	}
+	body := strings.NewReader(url.Values(form).Encode())
+	req, err := http.NewRequest("POST", endpoint, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req, nil
 }
 
 func httpRequest(client *http.Client, req *http.Request, response interface{}) error {
@@ -145,13 +153,15 @@ func httpRequest(client *http.Client, req *http.Request, response interface{}) e
 	return nil
 }
 
-//func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...DelReqOpts) (newToken *oauth2.Token, err error) {
-func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, resource []string) (newToken *oauth2.Token, err error) {
-	//delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
-	delRequest := NewObTokenRequest(subjectToken, resource)
+func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...oidc.TokenExchangeOption) (newToken *oauth2.Token, err error) {
+	delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
 	return p.TokenExchange(ctx, delRequest.TokenExchangeRequest)
 }
 
+func (p *DefaultProvider) ObTokenExchange(ctx context.Context, subjectToken string, resource string) (newToken *oauth2.Token, err error) {
+	delRequest := NewObTokenRequest(subjectToken, resource)
+	return p.TokenExchange(ctx, delRequest.TokenExchangeRequest)
+}
 func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
 	return func(o *DefaultProvider) {
 		o.httpClient = client

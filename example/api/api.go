@@ -63,7 +63,7 @@ func main() {
 			return
 		}
 		defautlProv := provider.(*defaults.DefaultProvider)
-		tokens, err := defautlProv.DelegationTokenExchange(r.Context(), token, []string{"Hodor"})
+		tokens, err := defautlProv.ObTokenExchange(r.Context(), token, "Hodor")
 		if err != nil {
 			http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
 			return
