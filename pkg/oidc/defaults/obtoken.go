@@ -8,7 +8,7 @@ import (
 //it exchanges a "urn:ietf:params:oauth:token-type:access_token" with an optional
 //"urn:ietf:params:oauth:token-type:access_token" actor token for a
 //"urn:ietf:params:oauth:token-type:access_token" delegation token
-type DelegationTokenRequest struct {
+type obTokenRequest struct {
 	*oidc.TokenExchangeRequest
 	// subjectToken string    `schema:"subject_token"`
 	// actorToken   string    `schema:"actor_token"`
@@ -17,9 +17,35 @@ type DelegationTokenRequest struct {
 	// scope        []string  `schema:"scope"`
 }
 
-func NewDelegationTokenRequest(subjectToken string, resource []string) *DelegationTokenRequest {
-	req := &DelegationTokenRequest{
-		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token")),
+// type DelReqOpts func(*DelegationTokenRequest)
+
+// func WithActorToken(token string) func(*DelegationTokenRequest) {
+// 	return func(req *DelegationTokenRequest) {
+// 		req.ActorToken = token
+// 	}
+// }
+
+// func WithAudience(audience []string) func(*DelegationTokenRequest) {
+// 	return func(req *DelegationTokenRequest) {
+// 		req.Audience = audience
+// 	}
+// }
+
+// func WithResource(resource []url.URL) func(*DelegationTokenRequest) {
+// 	return func(req *DelegationTokenRequest) {
+// 		req.Resource = resource
+// 	}
+// }
+
+// func WithScope(scope []string) func(*DelegationTokenRequest) {
+// 	return func(req *DelegationTokenRequest) {
+// 		req.Scope = scope
+// 	}
+// }
+
+func NewObTokenRequest(subjectToken string, resource []string) *obTokenRequest {
+	req := &obTokenRequest{
+		oidc.NewTokenExchangeRequest(subjectToken, oidc.AccessTokenType, oidc.WithGrantType("urn:abraxas:iam:grant_type:ob_token"), oidc.WithAudience(resource)),
 	}
 	return req
 }

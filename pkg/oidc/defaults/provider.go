@@ -2,8 +2,15 @@ package defaults
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
+
+	"github.com/gorilla/schema"
 
 	"github.com/caos/go-oidc/pkg/oidc/utils"
 
@@ -79,19 +86,70 @@ func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (tokens
 	return &oidc.Tokens{Token: token, IDTokenClaims: idToken}, nil
 }
 
+func (p *DefaultProvider) Introspect(ctx context.Context, accessToken string) (oidc.TokenIntrospectResponse, error) {
+	// req := &http.Request{}
+	// resp, err := p.httpClient.Do(req)
+	// if err != nil {
+
+	// }
+	// p.endpoints.IntrospectURL
+	return nil, nil
+}
+
 func (p *DefaultProvider) Authorize(ctx context.Context, accessToken string) {
 	p.oauthConfig.TokenSource(ctx, &oauth2.Token{AccessToken: accessToken})
 }
 func (p *DefaultProvider) Userinfo() {}
 
-func (p *DefaultProvider) TokenExchange(ctx context.Context, request oidc.TokenExchangeRequest) (newToken *oauth2.Token, err error) {
-	// p.oauthConfig.Endpoint.TokenURL
-	return nil, nil
+func (p *DefaultProvider) TokenExchange(ctx context.Context, request *oidc.TokenExchangeRequest) (newToken *oauth2.Token, err error) {
+	form := make(map[string][]string)
+	encoder := schema.NewEncoder()
+	if err := encoder.Encode(request, form); err != nil {
+		return nil, err
+	}
+	body := strings.NewReader(url.Values(form).Encode())
+	req, err := http.NewRequest("POST", p.endpoints.TokenURL, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	auth := base64.StdEncoding.EncodeToString([]byte(p.config.ClientID + ":" + p.config.ClientSecret))
+	req.Header.Set("Authorization", "Basic "+auth)
+	token := new(oauth2.Token)
+	if err := httpRequest(p.httpClient, req, token); err != nil {
+		return nil, err
+	}
+	return token, nil
 }
 
-func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...DelReqOpts) (newToken *oauth2.Token, err error) {
-	delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
-	return p.TokenExchange(ctx, delRequest)
+func httpRequest(client *http.Client, req *http.Request, response interface{}) error {
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read response body: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("http status not ok: %s %s", resp.Status, body)
+	}
+
+	err = json.Unmarshal(body, response)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal response: %v %s", err, body)
+	}
+	return nil
+}
+
+//func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...DelReqOpts) (newToken *oauth2.Token, err error) {
+func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, resource []string) (newToken *oauth2.Token, err error) {
+	//delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
+	delRequest := NewObTokenRequest(subjectToken, resource)
+	return p.TokenExchange(ctx, delRequest.TokenExchangeRequest)
 }
 
 func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
