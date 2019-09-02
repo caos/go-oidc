@@ -17,9 +17,9 @@ var (
 	issuer       string = "https://sta.accounts.abraxas.ch/"
 	callbackPath string = "/auth/callback"
 
-	publicURL         string = "/public"
-	protectedURL      string = "/protected"
-	protectedAdminURL string = "/protected/admin"
+	publicURL            string = "/public"
+	protectedURL         string = "/protected"
+	protectedExchangeURL string = "/protected/exchange"
 )
 
 func main() {
@@ -57,7 +57,7 @@ func main() {
 		w.Write(data)
 	})
 
-	http.HandleFunc(protectedAdminURL, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(protectedExchangeURL, func(w http.ResponseWriter, r *http.Request) {
 		ok, token := checkToken(w, r)
 		if !ok {
 			return
