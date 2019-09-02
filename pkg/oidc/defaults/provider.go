@@ -154,14 +154,13 @@ func httpRequest(client *http.Client, req *http.Request, response interface{}) e
 }
 
 func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectToken string, reqOpts ...oidc.TokenExchangeOption) (newToken *oauth2.Token, err error) {
-	delRequest := NewDelegationTokenRequest(subjectToken, reqOpts...)
-	return p.TokenExchange(ctx, delRequest.TokenExchangeRequest)
+	return p.TokenExchange(ctx, DelegationTokenRequest(subjectToken, reqOpts...))
 }
 
 func (p *DefaultProvider) ObTokenExchange(ctx context.Context, subjectToken string, resource string) (newToken *oauth2.Token, err error) {
-	delRequest := NewObTokenRequest(subjectToken, resource)
-	return p.TokenExchange(ctx, delRequest.TokenExchangeRequest)
+	return p.TokenExchange(ctx, ObTokenRequest(subjectToken, resource))
 }
+
 func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
 	return func(o *DefaultProvider) {
 		o.httpClient = client
