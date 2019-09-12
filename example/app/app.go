@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	clientID     string = "TM-V3"
+	clientID     string = "example"
 	clientSecret string = "changeme"
-	issuer       string = "https://sta.accounts.abraxas.ch/"
+	issuer       string = "https://some.oidc.endpoint/"
 	callbackPath string = "/auth/callback"
 	hashKey      []byte = []byte("test")
 )
