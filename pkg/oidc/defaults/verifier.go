@@ -22,7 +22,9 @@ func NewVerifier(issuer, clientID string, keySet oidc.KeySet, confOpts ...ConfFu
 	conf := &verifierConfig{
 		issuer:   issuer,
 		clientID: clientID,
-		iat:      &iatConfig{},
+		iat:      &iatConfig{
+			// offset: time.Duration(500 * time.Millisecond),
+		},
 	}
 
 	for _, opt := range confOpts {

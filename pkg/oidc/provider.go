@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -9,15 +10,28 @@ import (
 
 type Provider interface {
 	AuthURL(state string) string
-	CodeExchange(context.Context, string) (*Tokens, error)
-	Introspect(context.Context, string) (TokenIntrospectResponse, error)
-	Authorize(ctx context.Context, accessToken string) //TODO: ???
+	AuthURLHandler(state string) http.HandlerFunc
+	CodeExchange(ctx context.Context, code string) (*Tokens, error)
+	CodeExchangeHandler(callback func(http.ResponseWriter, *http.Request, *Tokens, string)) http.HandlerFunc
+	ClientCredentials(ctx context.Context, scopes ...string) (*oauth2.Token, error)
+	Introspect(ctx context.Context, token string) (TokenIntrospectResponse, error)
+	// Authorize(ctx context.Context, accessToken string) //TODO: ???
 	Userinfo()
+}
+
+type ProviderExtension interface {
+	Provider
+	PasswordGrant(context.Context, string, string) (*oauth2.Token, error)
 }
 
 type ProviderTokenExchange interface {
 	Provider
 	TokenExchange(context.Context, *TokenExchangeRequest) (*oauth2.Token, error)
+}
+
+type ProviderDelegationTokenExchange interface {
+	ProviderTokenExchange
+	DelegationTokenExchange(context.Context, string, ...TokenExchangeOption) (*oauth2.Token, error)
 }
 
 // type TokenExchangeRequest interface {

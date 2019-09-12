@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
+
+	"github.com/gorilla/securecookie"
+
+	"github.com/google/uuid"
 
 	"github.com/caos/go-oidc/pkg/oidc"
 	"github.com/caos/go-oidc/pkg/oidc/defaults"
+	"github.com/caos/go-oidc/pkg/oidc/utils"
 	"github.com/caos/utils/logging"
 )
 
@@ -17,29 +21,59 @@ var (
 	clientSecret string = "changeme"
 	issuer       string = "https://sta.accounts.abraxas.ch/"
 	callbackPath string = "/auth/callback"
+	hashKey      []byte = []byte("test")
 )
 
 func main() {
 	ctx := context.Background()
 
-	providerConfig := oidc.ProviderConfig{
+	providerConfig := &oidc.ProviderConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Issuer:       issuer,
 		CallbackURL:  "http://localhost:5556" + callbackPath,
 		Scopes:       []string{"openid", "profile", "email"},
 	}
-	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithVerifierConfig(defaults.WithIssuedAtOffset(1*time.Second)))
+	cookieHandler := utils.NewCookieHandler(securecookie.New([]byte("dsfd"), nil), utils.WithUnsecure(), utils.WithMaxAge(1))
+	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithCookieHandler(cookieHandler))
 	logging.Log("APP-nx6PeF").OnError(err).Panic("error creating provider")
 
-	state := "foobar"
+	// state := "foobar"
+	state := uuid.New().String()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, provider.AuthURL(state), http.StatusFound)
-	})
+	http.Handle("/login", provider.AuthURLHandler(state))
+	// http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+	// 	http.Redirect(w, r, provider.AuthURL(state), http.StatusFound)
+	// })
 
-	http.HandleFunc(callbackPath, func(w http.ResponseWriter, r *http.Request) {
-		tokens, err := provider.CodeExchange(ctx, r.URL.Query().Get("code"))
+	// http.HandleFunc(callbackPath, func(w http.ResponseWriter, r *http.Request) {
+	// 	tokens, err := provider.CodeExchange(ctx, r.URL.Query().Get("code"))
+	// 	if err != nil {
+	// 		http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
+	// 		return
+	// 	}
+	// 	data, err := json.Marshal(tokens)
+	// 	if err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 		return
+	// 	}
+	// 	w.Write(data)
+	// })
+
+	var marshal = func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens, state string) {
+		_ = state
+		data, err := json.Marshal(tokens)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+	}
+
+	http.Handle(callbackPath, provider.CodeExchangeHandler(marshal))
+
+	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		tokens, err := provider.ClientCredentials(ctx, "urn:abraxas:iam:audience_client_id:TM-V3")
 		if err != nil {
 			http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
 			return

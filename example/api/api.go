@@ -25,7 +25,7 @@ var (
 func main() {
 	// ctx := context.Background()
 
-	providerConfig := oidc.ProviderConfig{
+	providerConfig := &oidc.ProviderConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Issuer:       issuer,

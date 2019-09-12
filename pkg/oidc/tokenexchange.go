@@ -16,7 +16,7 @@ type TokenExchangeRequest struct {
 	subjectTokenType   string   `schema:"subject_token_type"`
 	actorToken         string   `schema:"actor_token"`
 	actorTokenType     string   `schema:"actor_token_type"`
-	resource           []string `schema:"resource"` //TODO: uri
+	resource           []string `schema:"resource"`
 	audience           []string `schema:"audience"`
 	scope              []string `schema:"scope"`
 	requestedTokenType string   `schema:"requested_token_type"`
