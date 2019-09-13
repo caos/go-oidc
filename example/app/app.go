@@ -6,8 +6,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/securecookie"
-
 	"github.com/google/uuid"
 
 	"github.com/caos/go-oidc/pkg/oidc"
@@ -34,7 +32,7 @@ func main() {
 		CallbackURL:  "http://localhost:5556" + callbackPath,
 		Scopes:       []string{"openid", "profile", "email"},
 	}
-	cookieHandler := utils.NewCookieHandler(securecookie.New([]byte("dsfd"), nil), utils.WithUnsecure(), utils.WithMaxAge(1))
+	cookieHandler := utils.NewCookieHandler([]byte("key"), nil, utils.WithUnsecure())
 	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithCookieHandler(cookieHandler))
 	logging.Log("APP-nx6PeF").OnError(err).Panic("error creating provider")
 

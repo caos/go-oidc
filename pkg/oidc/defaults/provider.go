@@ -115,6 +115,7 @@ func (p *DefaultProvider) CodeExchangeHandler(callback func(http.ResponseWriter,
 				http.Error(w, "failed to verify state: "+err.Error(), http.StatusUnauthorized)
 				return
 			}
+			p.cookieHandler.DeleteCookie(w, stateParam)
 		}
 		tokens, err := p.CodeExchange(r.Context(), r.URL.Query().Get("code"))
 		if err != nil {
