@@ -121,7 +121,7 @@ func DefaultACRVerifier(possibleValues []string) func(string) error {
 	}
 }
 
-func (v *Verifier) Verify(ctx context.Context, accessToken, idTokenString string) (*oidc.IDToken, error) {
+func (v *Verifier) Verify(ctx context.Context, accessToken, idTokenString string) (*oidc.IDTokenClaims, error) {
 	v.config.now = time.Now().UTC()
 	idToken, err := v.VerifyIDToken(ctx, idTokenString)
 	if err != nil {
@@ -140,7 +140,7 @@ func (v *Verifier) now() time.Time {
 	return v.config.now
 }
 
-func (v *Verifier) VerifyIDToken(ctx context.Context, idTokenString string) (*oidc.IDToken, error) {
+func (v *Verifier) VerifyIDToken(ctx context.Context, idTokenString string) (*oidc.IDTokenClaims, error) {
 	//1. if encrypted --> decrypt
 	decrypted, err := v.decryptToken(idTokenString)
 	if err != nil {
@@ -205,7 +205,7 @@ func (v *Verifier) VerifyIDToken(ctx context.Context, idTokenString string) (*oi
 	// return err
 }
 
-func (v *Verifier) parseToken(tokenString string) (*oidc.IDToken, []byte, error) {
+func (v *Verifier) parseToken(tokenString string) (*oidc.IDTokenClaims, []byte, error) {
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
 		return nil, nil, ValidationError("token contains an invalid number of segments") //TODO: err NewValidationError("token contains an invalid number of segments", ValidationErrorMalformed)
@@ -214,7 +214,7 @@ func (v *Verifier) parseToken(tokenString string) (*oidc.IDToken, []byte, error)
 	if err != nil {
 		return nil, nil, fmt.Errorf("oidc: malformed jwt payload: %v", err)
 	}
-	idToken := new(oidc.IDToken)
+	idToken := new(oidc.IDTokenClaims)
 	err = json.Unmarshal(payload, idToken)
 	return idToken, payload, err
 }

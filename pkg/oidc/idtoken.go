@@ -8,7 +8,7 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-type IDToken struct {
+type IDTokenClaims struct {
 	Issuer                              string    `json:"iss,omitempty"`
 	Subject                             string    `json:"sub,omitempty"`
 	Audiences                           []string  `json:"aud,omitempty"`
@@ -24,7 +24,7 @@ type IDToken struct {
 	Signature jose.SignatureAlgorithm //TODO: ???
 }
 
-func (t *IDToken) UnmarshalJSON(b []byte) error {
+func (t *IDTokenClaims) UnmarshalJSON(b []byte) error {
 	var i jsonIDToken
 	if err := json.Unmarshal(b, &i); err != nil {
 		return err
@@ -44,7 +44,7 @@ func (t *IDToken) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (t *IDToken) MarshalJSON() ([]byte, error) {
+func (t *IDTokenClaims) MarshalJSON() ([]byte, error) {
 	j := jsonIDToken{
 		Issuer:  t.Issuer,
 		Subject: t.Subject,
@@ -80,7 +80,7 @@ type jsonIDToken struct {
 
 type Tokens struct {
 	*oauth2.Token
-	IDTokenClaims *IDToken
+	IDTokenClaims *IDTokenClaims
 }
 
 // func (t *jsonIDToken) IDToken() *IDToken {

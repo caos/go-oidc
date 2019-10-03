@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	idTokenKey = "id_token"
 	stateParam = "state"
 )
 
@@ -27,10 +28,9 @@ type DefaultProvider struct {
 	cookieHandler *utils.CookieHandler
 
 	verifier oidc.Verifier
-	// verifierConfig []ConfFunc
 }
 
-func NewDefaultProvider(providerConfig *oidc.ProviderConfig, providerOptions ...oidc.ProviderOptionFunc) (oidc.ProviderDelegationTokenExchange, error) {
+func NewDefaultProvider(providerConfig *oidc.ProviderConfig, providerOptions ...DefaultProviderOpts) (oidc.ProviderDelegationTokenExchange, error) {
 	p := &DefaultProvider{
 		config:     providerConfig,
 		httpClient: oidc_http.DefaultHTTPClient,
@@ -51,25 +51,19 @@ func NewDefaultProvider(providerConfig *oidc.ProviderConfig, providerOptions ...
 	return p, nil
 }
 
-// func WithVerifierConfig(verifierConf ...ConfFunc) oidc.ProviderOptionFunc {
-// 	return oidc.ProviderOptionFunc(func(p oidc.Provider) {
-// 		prov, ok := p.(*DefaultProvider)
-// 		if ok {
-// 			prov.verifierConfig = verifierConf
-// 		}
-// 	})
-// }
+type DefaultProviderOpts func(p *DefaultProvider)
 
-func WithCookieHandler(cookieHandler *utils.CookieHandler) oidc.ProviderOptionFunc {
-	return oidc.ProviderOptionFunc(func(p oidc.Provider) {
-		prov, ok := p.(*DefaultProvider)
-		if ok {
-			prov.cookieHandler = cookieHandler
-		}
-	})
+func WithCookieHandler(cookieHandler *utils.CookieHandler) DefaultProviderOpts {
+	return func(p *DefaultProvider) {
+		p.cookieHandler = cookieHandler
+	}
 }
 
-const idTokenKey = "id_token"
+func WithHTTPClient(client *http.Client) DefaultProviderOpts {
+	return func(p *DefaultProvider) {
+		p.httpClient = client
+	}
+}
 
 func (p *DefaultProvider) AuthURL(state string) string {
 	return p.oauthConfig.AuthCodeURL(state)
@@ -77,11 +71,9 @@ func (p *DefaultProvider) AuthURL(state string) string {
 
 func (p *DefaultProvider) AuthURLHandler(state string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if p.cookieHandler != nil {
-			if err := p.cookieHandler.SetQueryCookie(w, stateParam, state); err != nil {
-				http.Error(w, "failed to create state cookie: "+err.Error(), http.StatusUnauthorized)
-				return
-			}
+		if err := p.trySetStateCookie(w, state); err != nil {
+			http.Error(w, "failed to create state cookie: "+err.Error(), http.StatusUnauthorized)
+			return
 		}
 		http.Redirect(w, r, p.AuthURL(state), http.StatusFound)
 	}
@@ -107,15 +99,10 @@ func (p *DefaultProvider) CodeExchange(ctx context.Context, code string) (tokens
 
 func (p *DefaultProvider) CodeExchangeHandler(callback func(http.ResponseWriter, *http.Request, *oidc.Tokens, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var state string
-		var err error
-		if p.cookieHandler != nil {
-			state, err = p.cookieHandler.CheckQueryCookie(r, stateParam)
-			if err != nil {
-				http.Error(w, "failed to verify state: "+err.Error(), http.StatusUnauthorized)
-				return
-			}
-			p.cookieHandler.DeleteCookie(w, stateParam)
+		state, err := p.tryReadStateCookie(w, r)
+		if err != nil {
+			http.Error(w, "failed to get state: "+err.Error(), http.StatusUnauthorized)
+			return
 		}
 		tokens, err := p.CodeExchange(r.Context(), r.URL.Query().Get("code"))
 		if err != nil {
@@ -167,12 +154,6 @@ func (p *DefaultProvider) DelegationTokenExchange(ctx context.Context, subjectTo
 	return p.TokenExchange(ctx, DelegationTokenRequest(subjectToken, reqOpts...))
 }
 
-func WithHTTPClient(client *http.Client) func(o *DefaultProvider) {
-	return func(o *DefaultProvider) {
-		o.httpClient = client
-	}
-}
-
 func (p *DefaultProvider) discover() error {
 	wellKnown := strings.TrimSuffix(p.config.Issuer, "/") + oidc.DiscoveryEndpoint
 
@@ -191,4 +172,25 @@ func (p *DefaultProvider) discover() error {
 		Scopes:       p.config.Scopes,
 	}
 	return nil
+}
+
+func (p *DefaultProvider) trySetStateCookie(w http.ResponseWriter, state string) error {
+	if p.cookieHandler != nil {
+		if err := p.cookieHandler.SetQueryCookie(w, stateParam, state); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *DefaultProvider) tryReadStateCookie(w http.ResponseWriter, r *http.Request) (state string, err error) {
+	if p.cookieHandler == nil {
+		return r.FormValue(stateParam), nil
+	}
+	state, err = p.cookieHandler.CheckQueryCookie(r, stateParam)
+	if err != nil {
+		return "", err
+	}
+	p.cookieHandler.DeleteCookie(w, stateParam)
+	return state, nil
 }

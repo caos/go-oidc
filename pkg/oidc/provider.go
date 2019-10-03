@@ -8,29 +8,67 @@ import (
 	"golang.org/x/oauth2"
 )
 
+//Provider declares the minimal interface for oidc clients
 type Provider interface {
+
+	//AuthURL returns the authorization endpoint with a given state
 	AuthURL(state string) string
+
+	//AuthURLHandler should implement the AuthURL func as http.HandlerFunc
+	//(redirecting to the auth endpoint)
 	AuthURLHandler(state string) http.HandlerFunc
+
+	//CodeExchange implements the OIDC Token Request (oauth2 Authorization Code Grant)
+	//returning an `Access Token` and `ID Token Claims`
 	CodeExchange(ctx context.Context, code string) (*Tokens, error)
+
+	//CodeExchangeHandler extends the CodeExchange func,
+	//calling the provided callback func on success with additional returned `state`
 	CodeExchangeHandler(callback func(http.ResponseWriter, *http.Request, *Tokens, string)) http.HandlerFunc
+
+	//ClientCredentials implements the oauth2 Client Credentials Grant
+	//requesting an `Access Token` for the client itself, without user context
 	ClientCredentials(ctx context.Context, scopes ...string) (*oauth2.Token, error)
+
+	//Introspects calls the Introspect Endpoint
+	//for validating an (access) token
 	Introspect(ctx context.Context, token string) (TokenIntrospectResponse, error)
-	// Authorize(ctx context.Context, accessToken string) //TODO: ???
+
+	//Userinfo implements the OIDC Userinfo call
+	//returning the info of the user for the requested scopes of an access token
 	Userinfo()
+
+	// Authorize(ctx context.Context, accessToken string) //TODO: ???
 }
 
+//ProviderExtension extends the `Provider` interface with the oauth2 `Password Grant`
+//
+//This interface is separated from the standard `Provider` interface as the `password grant`
+//is part of the oauth2 and therefore OIDC specification, but should only be used when there's no
+//other possibility, so IMHO never ever. Ever.
 type ProviderExtension interface {
 	Provider
+
+	//PasswordGrant implements the oauth2 `Password Grant`,
+	//requesting an access token with the users `username` and `password`
 	PasswordGrant(context.Context, string, string) (*oauth2.Token, error)
 }
 
+//ProviderTokenExchange extends the `Provider` interface for the *draft* oauth2 `Token Exchange`
 type ProviderTokenExchange interface {
 	Provider
+
+	//TokenExchange implement the `Token Echange Grant` exchanging some token for an other
 	TokenExchange(context.Context, *TokenExchangeRequest) (*oauth2.Token, error)
 }
 
+//ProviderTokenExchange extends the `ProviderTokenExchange` interface
+//for the specific `delegation token` request
 type ProviderDelegationTokenExchange interface {
 	ProviderTokenExchange
+
+	//DelegationTokenExchange implement the `Token Exchange Grant`
+	//providing an access token in request for a `delegation` token for a given resource / audience
 	DelegationTokenExchange(context.Context, string, ...TokenExchangeOption) (*oauth2.Token, error)
 }
 
