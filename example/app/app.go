@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/google/uuid"
 
@@ -15,24 +17,26 @@ import (
 )
 
 var (
-	clientID     string = "example"
-	clientSecret string = "changeme"
-	issuer       string = "https://some.oidc.endpoint/"
 	callbackPath string = "/auth/callback"
 	hashKey      []byte = []byte("test")
 )
 
 func main() {
+	clientID := os.Getenv("CLIENT_ID")
+	clientSecret := os.Getenv("CLIENT_SECRET")
+	issuer := os.Getenv("ISSUER")
+	port := os.Getenv("PORT")
+
 	ctx := context.Background()
 
 	providerConfig := &oidc.ProviderConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Issuer:       issuer,
-		CallbackURL:  "http://localhost:5556" + callbackPath,
+		CallbackURL:  fmt.Sprintf("http://localhost:%v%v", port, callbackPath),
 		Scopes:       []string{"openid", "profile", "email"},
 	}
-	cookieHandler := utils.NewCookieHandler([]byte("key"), nil, utils.WithUnsecure())
+	cookieHandler := utils.NewCookieHandler(hashKey, nil, utils.WithUnsecure())
 	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithCookieHandler(cookieHandler))
 	logging.Log("APP-nx6PeF").OnError(err).Panic("error creating provider")
 
@@ -84,6 +88,7 @@ func main() {
 		}
 		w.Write(data)
 	})
-	log.Printf("listening on http://%s/", "127.0.0.1:5556")
+	lis := fmt.Sprintf("127.0.0.1:%s", port)
+	log.Printf("listening on http://%s/", lis)
 	log.Fatal(http.ListenAndServe("127.0.0.1:5556", nil))
 }

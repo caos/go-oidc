@@ -2,37 +2,36 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"os"
 
 	"github.com/caos/go-oidc/pkg/oidc"
 	"github.com/caos/go-oidc/pkg/oidc/defaults"
 	"github.com/caos/utils/logging"
 )
 
-var (
-	clientID     string = "example"
-	clientSecret string = "changeme"
-	issuer       string = "https://some.oidc.endpoint/"
-	callbackPath string = "/auth/callback"
-
+const (
 	publicURL            string = "/public"
 	protectedURL         string = "/protected"
 	protectedExchangeURL string = "/protected/exchange"
 )
 
 func main() {
+	clientID := os.Getenv("CLIENT_ID")
+	clientSecret := os.Getenv("CLIENT_SECRET")
+	issuer := os.Getenv("ISSUER")
+	port := os.Getenv("PORT")
+
 	// ctx := context.Background()
 
 	providerConfig := &oidc.ProviderConfig{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Issuer:       issuer,
-		// CallbackURL:  "http://localhost:5556" + callbackPath,
-		// Scopes: []string{"openid", "profile", "email"},
 	}
-	provider, err := defaults.NewDefaultProvider(providerConfig, defaults.WithVerifierConfig(defaults.WithIssuedAtOffset(1*time.Second)))
+	provider, err := defaults.NewDefaultProvider(providerConfig)
 	logging.Log("APP-nx6PeF").OnError(err).Panic("error creating provider")
 
 	http.HandleFunc(publicURL, func(w http.ResponseWriter, r *http.Request) {
@@ -62,9 +61,7 @@ func main() {
 		if !ok {
 			return
 		}
-		tokens, err := provider.TokenExchange(r.Context(), oidc.NewTokenExchangeRequest(token, oidc.AccessTokenType, oidc.WithResource([]string{"Test"})))
-		// defautlProv := provider.(*defaults.DefaultProvider)
-		// tokens, err := defautlProv.DelegationTokenExchange(r.Context(), token, "Test")
+		tokens, err := provider.DelegationTokenExchange(r.Context(), token, oidc.WithResource([]string{"Test"}))
 		if err != nil {
 			http.Error(w, "failed to exchange token: "+err.Error(), http.StatusUnauthorized)
 			return
@@ -78,8 +75,9 @@ func main() {
 		w.Write(data)
 	})
 
-	log.Printf("listening on http://%s/", "127.0.0.1:5557")
-	log.Fatal(http.ListenAndServe("127.0.0.1:5557", nil))
+	lis := fmt.Sprintf("127.0.0.1:%s", port)
+	log.Printf("listening on http://%s/", lis)
+	log.Fatal(http.ListenAndServe(lis, nil))
 }
 
 func checkToken(w http.ResponseWriter, r *http.Request) (bool, string) {
