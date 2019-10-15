@@ -1,4 +1,4 @@
-package oidc
+package tokenexchange
 
 const (
 	AccessTokenType     = "urn:ietf:params:oauth:token-type:access_token"

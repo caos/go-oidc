@@ -13,6 +13,8 @@ type clientCredentialsGrant struct {
 	clientSecret string `schema:"client_secret"`
 }
 
+//ClientCredentialsGrantBasic creates an oauth2 `Client Credentials` Grant
+//sneding client_id and client_secret as basic auth header
 func ClientCredentialsGrantBasic(scopes ...string) *clientCredentialsGrantBasic {
 	return &clientCredentialsGrantBasic{
 		grantType: "client_credentials",
@@ -20,7 +22,9 @@ func ClientCredentialsGrantBasic(scopes ...string) *clientCredentialsGrantBasic 
 	}
 }
 
-func ClientCredentialsGrantParams(clientID, clientSecret string, scopes ...string) *clientCredentialsGrant {
+//ClientCredentialsGrantValues creates an oauth2 `Client Credentials` Grant
+//sneding client_id and client_secret as form values
+func ClientCredentialsGrantValues(clientID, clientSecret string, scopes ...string) *clientCredentialsGrant {
 	return &clientCredentialsGrant{
 		clientCredentialsGrantBasic: ClientCredentialsGrantBasic(scopes...),
 		clientID:                    clientID,
